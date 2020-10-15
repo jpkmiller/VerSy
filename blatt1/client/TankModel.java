@@ -37,8 +37,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 			x = x > WIDTH - FishModel.getXSize() - 1 ? WIDTH - FishModel.getXSize() - 1 : x;
 			y = y > HEIGHT - FishModel.getYSize() ? HEIGHT - FishModel.getYSize() : y;
 
-			FishModel fish = new FishModel("fish" + (++fishCounter) + "@" + getId(), x, y,
-					rand.nextBoolean() ? Direction.LEFT : Direction.RIGHT);
+			FishModel fish = new FishModel("fish" + (++fishCounter) + "@" + getId(), x, y, rand.nextBoolean() ? Direction.LEFT : Direction.RIGHT);
 
 			fishies.add(fish);
 		}

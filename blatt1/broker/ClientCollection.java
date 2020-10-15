@@ -57,12 +57,14 @@ public class ClientCollection<T> {
 		return clients.size();
 	}
 
-	public T getLeftNeighorOf(int index) {
-		return index == 0 ? clients.get(clients.size() - 1).client : clients.get(index - 1).client;
+	public T getLeftNeighborOf(int index) {
+		return clients.get((clients.size() - index - 1) % clients.size()).client;
+		// return index == 0 ? clients.get(clients.size() - 1).client : clients.get(index - 1).client;
 	}
 
-	public T getRightNeighorOf(int index) {
-		return index < clients.size() - 1 ? clients.get(index + 1).client : clients.get(0).client;
+	public T getRightNeighborOf(int index) {
+		return clients.get((index + 1) % clients.size()).client;
+		// return index < clients.size() - 1 ? clients.get(index + 1).client : clients.get(0).client;
 	}
 
 }

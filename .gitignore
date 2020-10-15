@@ -1,2 +1,12 @@
 \Folien
 \Beispiele?
+\out
+\.idea
+*.class
+*.exe
+*.txt
+*.cfg
+*.chm
+*.iml
+*.xml
+

@@ -1,11 +1,11 @@
 package common;
 
 public enum Direction {
-	LEFT(-1), RIGHT(+1);
+	LEFT(-2), RIGHT(+2);
 
 	private int vector;
 
-	private Direction(int vector) {
+	Direction(int vector) {
 		this.vector = vector;
 	}
 

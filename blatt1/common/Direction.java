@@ -1,7 +1,7 @@
 package common;
 
 public enum Direction {
-	LEFT(-2), RIGHT(+2);
+	LEFT(-1), RIGHT(+1);
 
 	private int vector;
 

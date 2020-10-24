@@ -23,7 +23,6 @@ public class Broker {
     }
 
     public void broker () {
-        System.out.println("All Systems running...");
         while (true) {
             Message msg = this.endpoint.blockingReceive();
             Serializable payload = msg.getPayload();
@@ -40,8 +39,8 @@ public class Broker {
 
     public void register (InetSocketAddress sender) {
         String clientId = "tank" + this.clientCollection.size();
-        this.endpoint.send(sender, new RegisterResponse(clientId));
         this.clientCollection.add(clientId, sender);
+        this.endpoint.send(sender, new RegisterResponse(clientId));
     }
 
     private boolean testingNeighbours () {

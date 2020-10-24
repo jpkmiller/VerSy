@@ -58,8 +58,8 @@ public class ClientCollection<T> {
 	}
 
 	public T getLeftNeighborOf(int index) {
-		return clients.get((clients.size() - index - 1) % clients.size()).client;
-		// return index == 0 ? clients.get(clients.size() - 1).client : clients.get(index - 1).client;
+		// return clients.get((index - 1 + clients.size()) % clients.size()).client;
+		return index == 0 ? clients.get(clients.size() - 1).client : clients.get(index - 1).client;
 	}
 
 	public T getRightNeighborOf(int index) {

@@ -2,14 +2,12 @@ package client;
 
 import java.net.InetSocketAddress;
 
+import common.Direction;
+import common.msgtypes.*;
 import messaging.Endpoint;
 import messaging.Message;
 import common.FishModel;
 import common.Properties;
-import common.msgtypes.DeregisterRequest;
-import common.msgtypes.HandoffRequest;
-import common.msgtypes.RegisterRequest;
-import common.msgtypes.RegisterResponse;
 
 public class ClientCommunicator {
 	private final Endpoint endpoint;
@@ -33,8 +31,8 @@ public class ClientCommunicator {
 			endpoint.send(broker, new DeregisterRequest(id));
 		}
 
-		public void handOff(FishModel fish) {
-			endpoint.send(broker, new HandoffRequest(fish));
+		public void handOff(FishModel fish, InetSocketAddress neighbour) {
+			endpoint.send(neighbour, new HandoffRequest(fish));
 		}
 	}
 
@@ -56,6 +54,16 @@ public class ClientCommunicator {
 				if (msg.getPayload() instanceof HandoffRequest)
 					tankModel.receiveFish(((HandoffRequest) msg.getPayload()).getFish());
 
+				if (msg.getPayload() instanceof NeighbourUpdate) {
+					NeighbourUpdate neighbourMsg = ((NeighbourUpdate) msg.getPayload());
+					if (neighbourMsg.getDirection() == Direction.LEFT) {
+						tankModel.leftNeighbour = neighbourMsg.getNeighbour();
+					} else {
+						tankModel.rightNeighbour = neighbourMsg.getNeighbour();
+					}
+					System.out.println("left of " + tankModel.getId() + " " + tankModel.leftNeighbour);
+					System.out.println("right of " + tankModel.getId() + " " + tankModel.rightNeighbour);
+				}
 			}
 			System.out.println("Receiver stopped.");
 		}

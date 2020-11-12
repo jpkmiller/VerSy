@@ -2,10 +2,7 @@ package broker;
 
 import common.Direction;
 import common.FishModel;
-import common.msgtypes.DeregisterRequest;
-import common.msgtypes.HandoffRequest;
-import common.msgtypes.RegisterRequest;
-import common.msgtypes.RegisterResponse;
+import common.msgtypes.*;
 import messaging.Endpoint;
 import messaging.Message;
 
@@ -26,7 +23,6 @@ public class Broker {
     ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
 
 
-
     class BrokerTask implements Runnable {
         Message msg;
 
@@ -44,8 +40,6 @@ public class Broker {
                 register(sender);
             } else if (payload instanceof DeregisterRequest) {
                 deregister((DeregisterRequest) payload);
-            } else if (payload instanceof HandoffRequest) {
-                handoffFish((HandoffRequest) payload, sender);
             } else if (payload instanceof PoisonPill) {
                 stopRequested = true;
             }
@@ -82,27 +76,22 @@ public class Broker {
 
     public void register (InetSocketAddress sender) {
         this.reentrantReadWriteLock.readLock().lock();
-        String clientId = "tank" + this.clientCollection.size();
+        int sizeClients = this.clientCollection.size();
+        String clientId = "tank" + sizeClients;
         this.clientCollection.add(clientId, sender);
+        // register new client
+
+        // update new neighbours
+        InetSocketAddress leftNeighbour = this.clientCollection.getClient(0);
+        InetSocketAddress rightNeighbour = this.clientCollection.getClient(sizeClients);
+        this.endpoint.send(sender, new NeighbourUpdate(leftNeighbour, Direction.LEFT));
+        this.endpoint.send(sender, new NeighbourUpdate(rightNeighbour, Direction.RIGHT));
+
+        // update existing neighbours
+        this.endpoint.send(leftNeighbour, new NeighbourUpdate(sender, Direction.RIGHT));
+        this.endpoint.send(rightNeighbour, new NeighbourUpdate(sender, Direction.LEFT));
         this.endpoint.send(sender, new RegisterResponse(clientId));
         this.reentrantReadWriteLock.readLock().unlock();
-    }
-
-    private boolean testingNeighbours () {
-        if (this.clientCollection.size() == 1) {
-            return this.clientCollection.getClient(0) == this.clientCollection.getLeftNeighborOf(0) &&
-                    this.clientCollection.getClient(0) == this.clientCollection.getRightNeighborOf(0);
-        } else if (this.clientCollection.size() == 2) {
-            return this.clientCollection.getClient(1) == this.clientCollection.getLeftNeighborOf(0) &&
-                    this.clientCollection.getClient(0) == this.clientCollection.getRightNeighborOf(1) &&
-                    this.clientCollection.getClient(1) == this.clientCollection.getRightNeighborOf(0) &&
-                    this.clientCollection.getClient(0) == this.clientCollection.getLeftNeighborOf(1);
-        } else if (this.clientCollection.size() == 3) {
-            return this.clientCollection.getClient(2) == this.clientCollection.getLeftNeighborOf(0) &&
-                    this.clientCollection.getClient(0) == this.clientCollection.getLeftNeighborOf(1) &&
-                    this.clientCollection.getClient(1) == this.clientCollection.getRightNeighborOf(0);
-        }
-        return false;
     }
 
     public void deregister (DeregisterRequest payload) {

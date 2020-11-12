@@ -75,22 +75,28 @@ public class Broker {
     }
 
     public void register (InetSocketAddress sender) {
+        // acquire lock
         this.reentrantReadWriteLock.readLock().lock();
         int sizeClients = this.clientCollection.size();
         String clientId = "tank" + sizeClients;
         this.clientCollection.add(clientId, sender);
-        // register new client
 
-        // update new neighbours
-        InetSocketAddress leftNeighbour = this.clientCollection.getClient(0);
-        InetSocketAddress rightNeighbour = this.clientCollection.getClient(sizeClients);
-        this.endpoint.send(sender, new NeighbourUpdate(leftNeighbour, Direction.LEFT));
-        this.endpoint.send(sender, new NeighbourUpdate(rightNeighbour, Direction.RIGHT));
+        // get neighbours
+        InetSocketAddress leftNeighbour = this.clientCollection.getLeftNeighborOf(sizeClients);
+        InetSocketAddress rightNeighbour = this.clientCollection.getRightNeighborOf(sizeClients);
 
         // update existing neighbours
         this.endpoint.send(leftNeighbour, new NeighbourUpdate(sender, Direction.RIGHT));
         this.endpoint.send(rightNeighbour, new NeighbourUpdate(sender, Direction.LEFT));
+
+        // give new client neighbours
+        this.endpoint.send(sender, new NeighbourUpdate(leftNeighbour, Direction.LEFT));
+        this.endpoint.send(sender, new NeighbourUpdate(rightNeighbour, Direction.RIGHT));
+
+        // register new client
         this.endpoint.send(sender, new RegisterResponse(clientId));
+
+        // release lock
         this.reentrantReadWriteLock.readLock().unlock();
     }
 

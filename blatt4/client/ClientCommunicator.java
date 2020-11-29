@@ -38,6 +38,12 @@ public class ClientCommunicator {
 		public void giveBackToken(InetSocketAddress receiver) {
 			endpoint.send(receiver, new Token());
 		}
+
+		public void sendMarker(InetSocketAddress receiver) { endpoint.send(receiver, new SnapshotMarker());}
+
+		public void updateGlobalState(CollectToken payload, InetSocketAddress receiver) {
+			endpoint.send(receiver, payload);
+		}
 	}
 
 	public class ClientReceiver extends Thread {
@@ -65,13 +71,22 @@ public class ClientCommunicator {
 					} else {
 						tankModel.rightNeighbour = neighbourMsg.getNeighbour();
 					}
-					System.out.println("left neighbour " + tankModel.leftNeighbour);
-					System.out.println("right neighbour " + tankModel.rightNeighbour);
 				}
 
 				if (msg.getPayload() instanceof Token) {
 					tankModel.receiveToken();
 				}
+
+				if (msg.getPayload() instanceof SnapshotMarker) {
+					System.out.println(tankModel.id + " received SnapshotMarker");
+					tankModel.receiveMarker(msg.getSender());
+				}
+
+				if (msg.getPayload() instanceof CollectToken) {
+					System.out.println(tankModel.id + " received GlobalState");
+					tankModel.receiveGlobalState((CollectToken) msg.getPayload());
+				}
+
 			}
 			System.out.println("Receiver stopped.");
 		}

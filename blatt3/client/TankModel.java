@@ -1,107 +1,132 @@
 package client;
 
-import java.net.InetSocketAddress;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.Observable;
-import java.util.Random;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-
 import common.Direction;
 import common.FishModel;
 
+import java.net.InetSocketAddress;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+
 public class TankModel extends Observable implements Iterable<FishModel> {
 
-	public static final int WIDTH = 600;
-	public static final int HEIGHT = 350;
-	protected static final int MAX_FISHIES = 5;
-	protected static final Random rand = new Random();
-	protected volatile String id;
-	protected final Set<FishModel> fishies;
-	protected int fishCounter = 0;
-	protected final client.ClientCommunicator.ClientForwarder forwarder;
-	protected InetSocketAddress leftNeighbour;
-	protected InetSocketAddress rightNeighbour;
+    public static final int WIDTH = 600;
+    public static final int HEIGHT = 350;
+    protected static final int MAX_FISHIES = 5;
+    protected static final Random rand = new Random();
+    protected volatile String id;
+    protected final Set<FishModel> fishies;
+    protected int fishCounter = 0;
+    protected final client.ClientCommunicator.ClientForwarder forwarder;
+    protected InetSocketAddress leftNeighbour;
+    protected InetSocketAddress rightNeighbour;
+    protected boolean hasToken;
+    protected Timer timer;
 
-	public TankModel(client.ClientCommunicator.ClientForwarder forwarder) {
-		this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<FishModel, Boolean>());
-		this.forwarder = forwarder;
-	}
+    public TankModel(client.ClientCommunicator.ClientForwarder forwarder) {
+        this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<FishModel, Boolean>());
+        this.forwarder = forwarder;
+        this.timer = new Timer();
+    }
 
-	synchronized void onRegistration(String id) {
-		this.id = id;
-		newFish(WIDTH - FishModel.getXSize(), rand.nextInt(HEIGHT - FishModel.getYSize()));
-	}
+    synchronized void onRegistration(String id) {
+        this.id = id;
+        newFish(WIDTH - FishModel.getXSize(), rand.nextInt(HEIGHT - FishModel.getYSize()));
+    }
 
-	public synchronized void newFish(int x, int y) {
-		if (fishies.size() < MAX_FISHIES) {
-			x = x > WIDTH - FishModel.getXSize() - 1 ? WIDTH - FishModel.getXSize() - 1 : x;
-			y = y > HEIGHT - FishModel.getYSize() ? HEIGHT - FishModel.getYSize() : y;
+    public synchronized void newFish(int x, int y) {
+        if (fishies.size() < MAX_FISHIES) {
+            x = x > WIDTH - FishModel.getXSize() - 1 ? WIDTH - FishModel.getXSize() - 1 : x;
+            y = y > HEIGHT - FishModel.getYSize() ? HEIGHT - FishModel.getYSize() : y;
 
-			FishModel fish = new FishModel("fish" + (++fishCounter) + "@" + getId(), x, y, rand.nextBoolean() ? Direction.LEFT : Direction.RIGHT);
+            FishModel fish = new FishModel("fish" + (++fishCounter) + "@" + getId(), x, y, rand.nextBoolean() ? Direction.LEFT : Direction.RIGHT);
 
-			fishies.add(fish);
-		}
-	}
+            fishies.add(fish);
+        }
+    }
 
-	synchronized void receiveFish(FishModel fish) {
-		fish.setToStart();
-		fishies.add(fish);
-	}
+    synchronized void receiveFish(FishModel fish) {
+        fish.setToStart();
+        fishies.add(fish);
+    }
 
-	public String getId() {
-		return id;
-	}
-	public InetSocketAddress getLeftNeighbour() { return leftNeighbour; }
-	public InetSocketAddress getRightNeighbour() { return rightNeighbour; }
+    public String getId() {
+        return id;
+    }
 
-	public synchronized int getFishCounter() {
-		return fishCounter;
-	}
+    public InetSocketAddress getLeftNeighbour() {
+        return leftNeighbour;
+    }
 
-	public synchronized Iterator<FishModel> iterator() {
-		return fishies.iterator();
-	}
+    public InetSocketAddress getRightNeighbour() {
+        return rightNeighbour;
+    }
 
-	private synchronized void updateFishies() {
-		for (Iterator<FishModel> it = iterator(); it.hasNext();) {
-			FishModel fish = it.next();
+    public synchronized int getFishCounter() {
+        return fishCounter;
+    }
 
-			fish.update();
+    public synchronized Iterator<FishModel> iterator() {
+        return fishies.iterator();
+    }
 
-			if (fish.hitsEdge()) {
-				forwarder.handOff(fish, fish.getDirection() == Direction.RIGHT ? getRightNeighbour() : getLeftNeighbour());
-			}
+    private synchronized void updateFishies() {
+        for (Iterator<FishModel> it = iterator(); it.hasNext(); ) {
+            FishModel fish = it.next();
 
-			if (fish.disappears()) {
-				it.remove();
-			}
-		}
-	}
+            fish.update();
 
-	private synchronized void update() {
-		updateFishies();
-		setChanged();
-		notifyObservers();
-	}
+            if (fish.hitsEdge()) {
+                if (hasToken()) {
+                    forwarder.handOff(fish, fish.getDirection() == Direction.RIGHT ? getRightNeighbour() : getLeftNeighbour());
+                } else {
+                    fish.reverse();
+                }
+            }
 
-	protected void run() {
-		forwarder.register();
+            if (fish.disappears()) {
+                it.remove();
+            }
+        }
+    }
 
-		try {
-			while (!Thread.currentThread().isInterrupted()) {
-				update();
-				TimeUnit.MILLISECONDS.sleep(10);
-			}
-		} catch (InterruptedException consumed) {
-			// allow method to terminate
-		}
-	}
+    public void receiveToken() {
+        this.hasToken = true;
+        this.timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                hasToken = false;
+                forwarder.giveBackToken(leftNeighbour);
+            }
+        }, 2000L);
+    }
 
-	public synchronized void finish() {
-		forwarder.deregister(id);
-	}
+
+    public boolean hasToken() {
+        return this.hasToken;
+    }
+
+    private synchronized void update() {
+        updateFishies();
+        setChanged();
+        notifyObservers();
+    }
+
+    protected void run() {
+        forwarder.register();
+
+        try {
+            while (!Thread.currentThread().isInterrupted()) {
+                update();
+                TimeUnit.MILLISECONDS.sleep(10);
+            }
+        } catch (InterruptedException consumed) {
+            // allow method to terminate
+        }
+    }
+
+    public synchronized void finish() {
+        forwarder.deregister(id);
+    }
 
 }

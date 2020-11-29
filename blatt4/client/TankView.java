@@ -9,8 +9,7 @@ import java.awt.event.MouseEvent;
 import java.util.Observable;
 import java.util.Observer;
 
-import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 
 import common.FishModel;
 
@@ -58,6 +57,9 @@ public class TankView extends JPanel implements Observer {
 		if (!tankModel.hasToken())
 			drawBorders(g2d);
 
+		if (tankModel.isFinishedGlobalState()) {
+			g2d.drawString(String.valueOf(tankModel.getGlobalState().size()), 10,10);
+		}
 	}
 
 	@Override

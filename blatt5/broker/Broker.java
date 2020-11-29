@@ -1,7 +1,6 @@
 package broker;
 
 import common.Direction;
-import common.FishModel;
 import common.msgtypes.*;
 import messaging.Endpoint;
 import messaging.Message;
@@ -9,6 +8,8 @@ import messaging.Message;
 import javax.swing.*;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -22,6 +23,7 @@ public class Broker {
     private static final int POOL_SIZE = (int) (Runtime.getRuntime().availableProcessors() / 0.5);
     ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
     boolean hasToken;
+    Map<String, InetSocketAddress> nameService;
 
 
     class BrokerTask implements Runnable {
@@ -43,6 +45,8 @@ public class Broker {
                 deregister((DeregisterRequest) payload);
             } else if (payload instanceof PoisonPill) {
                 stopRequested = true;
+            } else if (payload instanceof NameResolutionRequest) {
+                resoluteName((NameResolutionRequest) payload, sender);
             }
         }
     }
@@ -56,16 +60,17 @@ public class Broker {
         }
     }
 
-    public Broker () {
+    public Broker() {
         this.stopRequested = false;
         this.hasToken = true;
         this.clientCollection = new ClientCollection<>();
         this.endpoint = new Endpoint(4712);
         this.pool = Executors.newFixedThreadPool(POOL_SIZE);
+        this.nameService = new HashMap<>();
         pool.execute(new StopRequested());
     }
 
-    public void broker () {
+    public void broker() {
         Message msg;
         while (!this.stopRequested) {
             if ((msg = endpoint.nonBlockingReceive()) != null) {
@@ -76,12 +81,13 @@ public class Broker {
         System.out.println("Exited Broker");
     }
 
-    public void register (InetSocketAddress sender) {
+    public void register(InetSocketAddress sender) {
         // acquire lock
         this.reentrantReadWriteLock.readLock().lock();
         int sizeClients = this.clientCollection.size();
         String clientId = "tank" + sizeClients;
         this.clientCollection.add(clientId, sender);
+        this.nameService.put(clientId, sender);
 
         // get neighbours
         InetSocketAddress leftNeighbour = this.clientCollection.getLeftNeighborOf(sizeClients);
@@ -106,14 +112,20 @@ public class Broker {
         this.reentrantReadWriteLock.readLock().unlock();
     }
 
-    public void deregister (DeregisterRequest payload) {
+    public void deregister(DeregisterRequest payload) {
         this.reentrantReadWriteLock.readLock().lock();
         InetSocketAddress leftNeighbour = this.clientCollection.getLeftNeighborOf(this.clientCollection.indexOf(payload.getId()));
         InetSocketAddress rightNeighbour = this.clientCollection.getLeftNeighborOf(this.clientCollection.indexOf(payload.getId()));
         this.endpoint.send(leftNeighbour, new NeighbourUpdate(rightNeighbour, Direction.RIGHT));
         this.endpoint.send(rightNeighbour, new NeighbourUpdate(leftNeighbour, Direction.LEFT));
         this.clientCollection.remove(this.clientCollection.indexOf(payload.getId()));
+        this.nameService.remove(payload.getId());
         this.reentrantReadWriteLock.readLock().unlock();
+    }
+
+    private void resoluteName(NameResolutionRequest payload, InetSocketAddress sender) {
+        InetSocketAddress response = nameService.get(payload.getTankId());
+        this.endpoint.send(sender, new NameResolutionResponse(response, payload.getRequestId()));
     }
 
     public static void main(String[] args) {

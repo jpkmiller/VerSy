@@ -5,6 +5,7 @@ import common.FishModel;
 import common.ReferenceState;
 import common.State;
 import common.msgtypes.CollectToken;
+import common.msgtypes.LocationUpdate;
 import common.msgtypes.NameResolutionResponse;
 
 import java.net.InetSocketAddress;
@@ -35,6 +36,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
     protected State recordState;
     protected CollectToken globalState;
     protected final Map<String, ReferenceState> fishieReference;
+    protected final Map<String, InetSocketAddress> fishieAddress;
 
     public TankModel(client.ClientCommunicator.ClientForwarder forwarder) {
         this.fishies = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -44,6 +46,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
         this.leftState = Collections.newSetFromMap(new ConcurrentHashMap<>());
         this.rightState = Collections.newSetFromMap(new ConcurrentHashMap<>());
         this.fishieReference = new ConcurrentHashMap<>();
+        this.fishieAddress = new HashMap<>();
     }
 
     synchronized void onRegistration(String id) {
@@ -60,6 +63,7 @@ public class TankModel extends Observable implements Iterable<FishModel> {
 
             // add fishie to reference map
             this.fishieReference.put(fish.getId(), ReferenceState.HERE);
+            this.fishieAddress.put(fish.getId(), null);
 
             fishies.add(fish);
         }
@@ -79,6 +83,12 @@ public class TankModel extends Observable implements Iterable<FishModel> {
             this.fishieReference.put(fish.getId(), ReferenceState.HERE);
         else
             this.fishieReference.replace(fish.getId(), ReferenceState.HERE);
+
+        // heimatgestützter Ansatz
+        if (fish.getTankId().equals(getId()))
+            this.fishieAddress.replace(fish.getId(), null);
+        else
+            this.forwarder.sendNameResolutionRequest(fish.getTankId(), fish.getId());
 
         fishies.add(fish);
     }
@@ -219,22 +229,46 @@ public class TankModel extends Observable implements Iterable<FishModel> {
         }
     }
 
+    /*
+    // vorwärtsreferenzen
     public void locateFishGlobally(String fishId) {
         if (this.fishieReference.containsKey(fishId)) {
             ReferenceState fishieReference = this.fishieReference.get(fishId);
             if (fishieReference == ReferenceState.HERE) {
-                for (FishModel fish : fishies) {
-                    if (fish.getId().equals(fishId)) {
-                        fish.toggle();
-                        return;
-                    }
-                }
+                locateFishLocally(fishId);
             } else if (fishieReference == ReferenceState.RIGHT) {
                 forwarder.sendLocationRequest(fishId, rightNeighbour);
             } else {
                 forwarder.sendLocationRequest(fishId, leftNeighbour);
             }
         }
+    }
+    */
+
+    // heimatgestützter Ansatz
+    public void locateFishGlobally(String fishId) {
+        if (!locateFishLocally(fishId)) {
+            System.out.println(this.fishieAddress.get(fishId));
+            forwarder.sendLocationRequest(fishId, this.fishieAddress.get(fishId));
+        }
+    }
+
+    public boolean locateFishLocally(String fishId) {
+        for (FishModel fish : fishies) {
+            if (fish.getId().equals(fishId)) {
+                fish.toggle();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void updateFishieLocation(LocationUpdate payload, InetSocketAddress sender) {
+        this.fishieAddress.put(payload.getRequestId(), sender);
+    }
+
+    public void receiveNameResolution(NameResolutionResponse payload) {
+        this.forwarder.sendLocationUpdate(payload.getRequestId(), payload.getResponse());
     }
 
     public void receiveToken() {

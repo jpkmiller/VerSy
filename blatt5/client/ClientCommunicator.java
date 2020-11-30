@@ -2,7 +2,6 @@ package client;
 
 import common.Direction;
 import common.FishModel;
-import common.LocationRequest;
 import common.Properties;
 import common.msgtypes.*;
 import messaging.Endpoint;
@@ -55,6 +54,10 @@ public class ClientCommunicator {
         public void sendNameResolutionRequest(String tankId, String requestId) {
             endpoint.send(broker, new NameResolutionRequest(tankId, requestId));
         }
+
+        public void sendLocationUpdate(String requestId, InetSocketAddress receiver) {
+            endpoint.send(receiver, new LocationUpdate(requestId));
+        }
     }
 
     public class ClientReceiver extends Thread {
@@ -99,11 +102,15 @@ public class ClientCommunicator {
                 }
 
                 if (msg.getPayload() instanceof LocationRequest) {
-                    tankModel.locateFishGlobally(((LocationRequest) msg.getPayload()).getFishId());
+                    tankModel.locateFishLocally(((LocationRequest) msg.getPayload()).getFishId());
+                }
+
+                if (msg.getPayload() instanceof LocationUpdate) {
+                    tankModel.updateFishieLocation((LocationUpdate) msg.getPayload(), msg.getSender());
                 }
 
                 if (msg.getPayload() instanceof NameResolutionResponse) {
-                    // tankModel.receiveNameResolution((NameResolutionResponse) msg.getPayload());
+                    tankModel.receiveNameResolution((NameResolutionResponse) msg.getPayload());
                 }
 
             }

@@ -1,4 +1,4 @@
-package common;
+package common.msgtypes;
 
 import java.io.Serializable;
 

@@ -75,6 +75,8 @@ public class ClientCommunicator {
         public void run() {
             while (!isInterrupted()) {
                 Message msg = endpoint.blockingReceive();
+                if (msg == null)
+                    continue;
 
                 if (msg.getPayload() instanceof RegisterResponse) {
                     RegisterResponse response = (RegisterResponse) msg.getPayload();
